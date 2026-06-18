@@ -1,4 +1,4 @@
-
+import os
 import pandas as pd
 import xgboost as xgb
 import joblib
@@ -11,9 +11,16 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 
-
-from huggingface_hub import HfApi, create_repo
+from huggingface_hub import HfApi, create_repo, login
 from huggingface_hub.utils import RepositoryNotFoundError
+
+# --------------------------------------------------
+# Hugging Face Login (IMPORTANT - fixes 429 error)
+# --------------------------------------------------
+
+login(token=os.getenv("HF_TOKEN"))
+
+api = HfApi()
 
 # --------------------------------------------------
 # MLflow Setup
@@ -23,33 +30,32 @@ mlflow.set_tracking_uri("http://localhost:5000")
 mlflow.set_experiment("tourism-model-training")
 
 # --------------------------------------------------
-# Hugging Face
+# Load Train/Test Data (with authentication)
 # --------------------------------------------------
 
-api = HfApi()
-
-# --------------------------------------------------
-# Load Train/Test Data
-# --------------------------------------------------
+storage_opts = {"token": os.getenv("HF_TOKEN")}
 
 Xtrain = pd.read_csv(
-    "hf://datasets/jyotibudharapu/tourism/Xtrain.csv"
+    "hf://datasets/jyotibudharapu/tourism/Xtrain.csv",
+    storage_options=storage_opts
 )
 
 Xtest = pd.read_csv(
-    "hf://datasets/jyotibudharapu/tourism/Xtest.csv"
+    "hf://datasets/jyotibudharapu/tourism/Xtest.csv",
+    storage_options=storage_opts
 )
 
 ytrain = pd.read_csv(
-    "hf://datasets/jyotibudharapu/tourism/ytrain.csv"
+    "hf://datasets/jyotibudharapu/tourism/ytrain.csv",
+    storage_options=storage_opts
 ).squeeze()
 
 ytest = pd.read_csv(
-    "hf://datasets/jyotibudharapu/tourism/ytest.csv"
+    "hf://datasets/jyotibudharapu/tourism/ytest.csv",
+    storage_options=storage_opts
 ).squeeze()
 
-print("Training data loaded successfully.?")
-
+print("✅ Training data loaded successfully.")
 
 # --------------------------------------------------
 # Identify Columns
@@ -62,11 +68,7 @@ num_cols = Xtrain.select_dtypes(exclude="object").columns
 # Handle Class Imbalance
 # --------------------------------------------------
 
-
-class_weight = (
-    ytrain.value_counts()[0] / ytrain.value_counts()[1]
-)
-
+class_weight = ytrain.value_counts()[0] / ytrain.value_counts()[1]
 
 # --------------------------------------------------
 # Preprocessing Pipeline
@@ -79,18 +81,15 @@ preprocessor = ColumnTransformer(
     ]
 )
 
-
 # --------------------------------------------------
 # XGBoost Model
 # --------------------------------------------------
-
 
 xgb_model = xgb.XGBClassifier(
     random_state=42,
     scale_pos_weight=class_weight,
     eval_metric="logloss"
 )
-
 
 # --------------------------------------------------
 # Full Pipeline
@@ -101,11 +100,9 @@ pipeline = Pipeline([
     ("model", xgb_model)
 ])
 
-
 # --------------------------------------------------
 # Hyperparameter Grid
 # --------------------------------------------------
-
 
 param_grid = {
     "model__n_estimators": [50, 100],
@@ -115,11 +112,9 @@ param_grid = {
     "model__colsample_bytree": [0.8, 1.0]
 }
 
-
 # --------------------------------------------------
 # MLflow Tracking
 # --------------------------------------------------
-
 
 with mlflow.start_run():
 
@@ -135,28 +130,18 @@ with mlflow.start_run():
 
     results = grid_search.cv_results_
 
-
-# Log all runs
+    # Log all runs
     for i in range(len(results["params"])):
 
         with mlflow.start_run(nested=True):
 
             mlflow.log_params(results["params"][i])
-
-            mlflow.log_metric(
-                "mean_test_score",
-                results["mean_test_score"][i]
-            )
-
-            mlflow.log_metric(
-                "std_test_score",
-                results["std_test_score"][i]
-            )
+            mlflow.log_metric("mean_test_score", results["mean_test_score"][i])
+            mlflow.log_metric("std_test_score", results["std_test_score"][i])
 
     mlflow.log_params(grid_search.best_params_)
 
     best_model = grid_search.best_estimator_
-
 
     # --------------------------------------------------
     # Evaluation
@@ -165,17 +150,8 @@ with mlflow.start_run():
     y_pred_train = best_model.predict(Xtrain)
     y_pred_test = best_model.predict(Xtest)
 
-    train_report = classification_report(
-        ytrain,
-        y_pred_train,
-        output_dict=True
-    )
-
-    test_report = classification_report(
-        ytest,
-        y_pred_test,
-        output_dict=True
-    )
+    train_report = classification_report(ytrain, y_pred_train, output_dict=True)
+    test_report = classification_report(ytest, y_pred_test, output_dict=True)
 
     mlflow.log_metrics({
         "train_accuracy": train_report["accuracy"],
@@ -192,49 +168,28 @@ with mlflow.start_run():
     # Save Model
     # --------------------------------------------------
 
-    model_path = "tourism_model_v1.joblib"
+    model_path = "tourism_pipeline_v1.joblib"
 
-    joblib.dump(
-        best_model,
-        model_path
-    )
+    joblib.dump(best_model, model_path)
 
-    mlflow.log_artifact(
-        model_path,
-        artifact_path="model"
-    )
+    mlflow.log_artifact(model_path, artifact_path="model")
 
-    print(
-        f"Model saved locally: {model_path}"
-    )
+    print(f"✅ Model saved locally: {model_path}")
 
     # --------------------------------------------------
-    # Upload to Hugging Face Model Hub
+    # Upload to Hugging Face
     # --------------------------------------------------
 
     repo_id = "jyotibudharapu/tourism-model"
 
     try:
-        api.repo_info(
-            repo_id=repo_id,
-            repo_type="model"
-        )
-
-        print(
-            f"Model repo '{repo_id}' already exists."
-        )
+        api.repo_info(repo_id=repo_id, repo_type="model")
+        print(f"Model repo '{repo_id}' already exists.")
 
     except RepositoryNotFoundError:
 
-        create_repo(
-            repo_id=repo_id,
-            repo_type="model",
-            private=False
-        )
-
-        print(
-            f"Created model repo '{repo_id}'."
-        )
+        create_repo(repo_id=repo_id, repo_type="model", private=False)
+        print(f"Created model repo '{repo_id}'.")
 
     api.upload_file(
         path_or_fileobj=model_path,
@@ -243,9 +198,7 @@ with mlflow.start_run():
         repo_type="model"
     )
 
-    print(
-        "Model uploaded to Hugging Face."
-    )
+    print("✅ Model uploaded to Hugging Face.")
 
-print("Training completed.")
+print("✅ Training completed.")
 print("Best Parameters:", grid_search.best_params_)
