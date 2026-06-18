@@ -116,10 +116,10 @@ param_grid = {
 # MLflow Tracking
 # --------------------------------------------------
 
+
 with mlflow.start_run():
 
-  
-  grid_search = GridSearchCV(
+    grid_search = GridSearchCV(
         estimator=pipeline,
         param_grid=param_grid,
         cv=5,
@@ -127,10 +127,10 @@ with mlflow.start_run():
         n_jobs=-1
     )
 
-
     grid_search.fit(Xtrain, ytrain)
 
     results = grid_search.cv_results_
+
 
 # Log all runs
     for i in range(len(results["params"])):
