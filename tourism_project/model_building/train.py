@@ -7,6 +7,10 @@ import mlflow.sklearn
 
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import classification_report
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+
 
 from huggingface_hub import HfApi, create_repo
 from huggingface_hub.utils import RepositoryNotFoundError
