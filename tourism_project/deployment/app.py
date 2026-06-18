@@ -147,7 +147,6 @@ product_pitched = st.selectbox(
     ["Basic", "Standard", "Deluxe", "Super Deluxe", "King"]
 )
 
-
 # --------------------------------------------------
 # Prediction
 # --------------------------------------------------
@@ -171,9 +170,8 @@ if st.button("Predict"):
         "NumberOfChildrenVisiting": num_children,
         "Designation": designation,
         "MonthlyIncome": monthly_income,  
-        NumberOfFollowups": num_followups,
+        "NumberOfFollowups": num_followups,
         "ProductPitched": product_pitched
-
     }])
 
     prediction = model.predict(input_df)[0]
