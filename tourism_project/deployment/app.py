@@ -134,6 +134,20 @@ monthly_income = st.number_input(
     value=30000
 )
 
+
+num_followups = st.number_input(
+    "Number Of Followups",
+    min_value=0,
+    max_value=10,
+    value=2
+)
+
+product_pitched = st.selectbox(
+    "Product Pitched",
+    ["Basic", "Standard", "Deluxe", "Super Deluxe", "King"]
+)
+``
+
 # --------------------------------------------------
 # Prediction
 # --------------------------------------------------
@@ -156,7 +170,10 @@ if st.button("Predict"):
         "PitchSatisfactionScore": pitch_score,
         "NumberOfChildrenVisiting": num_children,
         "Designation": designation,
-        "MonthlyIncome": monthly_income
+        "MonthlyIncome": monthly_income,  
+        NumberOfFollowups": num_followups,
+        "ProductPitched": product_pitched
+
     }])
 
     prediction = model.predict(input_df)[0]
