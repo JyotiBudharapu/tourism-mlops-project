@@ -46,18 +46,40 @@ ytest = pd.read_csv(
 
 print("Training data loaded successfully.")
 
+
+# --------------------------------------------------
+# Identify Columns
+# --------------------------------------------------
+
+cat_cols = Xtrain.select_dtypes(include="object").columns
+num_cols = Xtrain.select_dtypes(exclude="object").columns
+
 # --------------------------------------------------
 # Handle Class Imbalance
 # --------------------------------------------------
 
+
 class_weight = (
-    ytrain.value_counts()[0]
-    / ytrain.value_counts()[1]
+    ytrain.value_counts()[0] / ytrain.value_counts()[1]
 )
+
+
+# --------------------------------------------------
+# Preprocessing Pipeline
+# --------------------------------------------------
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ("cat", OneHotEncoder(drop="first", handle_unknown="ignore"), cat_cols),
+        ("num", "passthrough", num_cols)
+    ]
+)
+
 
 # --------------------------------------------------
 # XGBoost Model
 # --------------------------------------------------
+
 
 xgb_model = xgb.XGBClassifier(
     random_state=42,
@@ -65,17 +87,30 @@ xgb_model = xgb.XGBClassifier(
     eval_metric="logloss"
 )
 
+
+# --------------------------------------------------
+# Full Pipeline
+# --------------------------------------------------
+
+pipeline = Pipeline([
+    ("preprocessor", preprocessor),
+    ("model", xgb_model)
+])
+
+
 # --------------------------------------------------
 # Hyperparameter Grid
 # --------------------------------------------------
 
+
 param_grid = {
-    "n_estimators": [50, 100],
-    "max_depth": [3, 5],
-    "learning_rate": [0.05, 0.1],
-    "subsample": [0.8, 1.0],
-    "colsample_bytree": [0.8, 1.0]
+    "model__n_estimators": [50, 100],
+    "model__max_depth": [3, 5],
+    "model__learning_rate": [0.05, 0.1],
+    "model__subsample": [0.8, 1.0],
+    "model__colsample_bytree": [0.8, 1.0]
 }
+
 
 # --------------------------------------------------
 # MLflow Tracking
@@ -83,18 +118,21 @@ param_grid = {
 
 with mlflow.start_run():
 
-    grid_search = GridSearchCV(
-        estimator=xgb_model,
+  
+  grid_search = GridSearchCV(
+        estimator=pipeline,
         param_grid=param_grid,
         cv=5,
         scoring="recall",
         n_jobs=-1
     )
 
+
     grid_search.fit(Xtrain, ytrain)
 
     results = grid_search.cv_results_
 
+# Log all runs
     for i in range(len(results["params"])):
 
         with mlflow.start_run(nested=True):
@@ -111,11 +149,10 @@ with mlflow.start_run():
                 results["std_test_score"][i]
             )
 
-    mlflow.log_params(
-        grid_search.best_params_
-    )
+    mlflow.log_params(grid_search.best_params_)
 
     best_model = grid_search.best_estimator_
+
 
     # --------------------------------------------------
     # Evaluation
