@@ -48,7 +48,7 @@ ytest = pd.read_csv(
     "hf://datasets/jyotibudharapu/tourism/ytest.csv"
 ).squeeze()
 
-print("Training data loaded successfully.")
+print("Training data loaded successfully.?")
 
 
 # --------------------------------------------------
