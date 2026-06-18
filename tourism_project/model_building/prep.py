@@ -37,12 +37,7 @@ cat_cols = df.select_dtypes(include=["object"]).columns
 for col in cat_cols:
     df[col].fillna(df[col].mode()[0], inplace=True)
 
-# Encoding the categorical 'Type' column
-df = pd.get_dummies(
-    df,
-    columns=cat_cols,
-    drop_first=True
-)
+# NO encoding here
 
 
 target_col = "ProdTaken"
