@@ -146,7 +146,7 @@ product_pitched = st.selectbox(
     "Product Pitched",
     ["Basic", "Standard", "Deluxe", "Super Deluxe", "King"]
 )
-``
+
 
 # --------------------------------------------------
 # Prediction
